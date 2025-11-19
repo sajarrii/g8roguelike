@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>地牢抽风模拟器 - Web Roguelike</title>
+  <style>
+    body {
+      background: #000;
+      color: #eee;
+      font-family: "Consolas", "Fira Code", monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px;
+    }
+    h1 {
+      margin: 5px;
+      font-size: 22px;
+      color: #ffd54f;
+      text-shadow: 0 0 8px #ffb300;
+    }
+    button {
+      padding: 6px 14px;
+      margin: 4px;
+      border: 1px solid #555;
+      background: #222;
+      color: #eee;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #333;
+    }
+    #mainMenu, #settingsScreen, #achievementsScreen {
+      border: 1px solid #555;
+      padding: 10px;
+      background: #111;
+      box-shadow: 0 0 10px #222;
+      margin-top: 8px;
+      min-width: 420px;
+    }
+    #container {
+      display: none;
+      border: 1px solid #555;
+      padding: 8px;
+      background: #111;
+      box-shadow: 0 0 10px #222;
+      margin-top: 8px;
+    }
+    #stats {
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    #instructions {
+      margin: 4px 0 4px;
+      font-size: 12px;
+      color: #aaa;
+    }
+    #legend {
+      margin: 4px 0;
+      font-size: 12px;
+      color: #ccc;
+      border-top: 1px solid #333;
+      padding-top: 4px;
+    }
+    #game {
+      font-size: 18px;
+      line-height: 1.05;
+      white-space: pre;
+      background: #000;
+      padding: 4px;
+      border: 1px solid #333;
+      min-width: 420px;
+      min-height: 320px;
+    }
+    #log {
+      margin-top: 6px;
+      font-size: 12px;
+      max-height: 160px;
+      overflow-y: auto;
+      border-top: 1px solid #333;
+      padding-top: 4px;
+    }
+    .log-line {
+      margin: 2px 0;
+    }
+    .log-good { color: #8bc34a; }
+    .log-bad { color: #ef5350; }
+    .log-info { color: #29b6f6; }
+    .log-silly { color: #ba68c8; }
+
+    #saveLoadBar {
+      margin: 4px 0;
+      font-size: 12px;
+    }
+
+    /* 设置界面 */
+    .setting-section {
+      margin-bottom: 8px;
+      border-top: 1px solid #333;
+      padding-top: 6px;
+    }
+    .setting-section h3 {
+      margin: 2px 0 4px;
+      font-size: 14px;
+      color: #ffcc80;
+    }
+    .control-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+    .control-row span {
+      width: 80px;
+    }
+    .control-input {
+      background: #000;
+      border: 1px solid #555;
+      color: #eee;
+      padding: 2px 4px;
+      width: 120px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    /* 成就界面 */
+    #achievementsList {
+      margin-top: 6px;
+      font-size: 13px;
+    }
+    .achievement {
+      margin: 4px 0;
+      padding: 4px 6px;
+      border-left: 3px solid #444;
+      background: #050505;
+    }
+    .ach-blue  { color: #64b5f6; border-color: #64b5f6; }
+    .ach-purple{ color: #b388ff; border-color: #b388ff; }
+    .ach-pink  { color: #f48fb1; border-color: #f48fb1; }
+    .ach-red   { color: #ef5350; border-color: #ef5350; }
+    .ach-gold  { color: #ffd54f; border-color: #ffd54f; }
+
+    .back-btn {
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>地牢抽风模拟器</h1>
+
+  <!-- 主菜单 -->
+  <div id="mainMenu">
+    <p>一款专门拿来<b>自娱自乐 + 发给朋友整活</b>的简易 Roguelike。</p>
+    <button onclick="startNewGame()">开始游戏</button>
+    <button onclick="openSettings()">设置</button>
+    <button onclick="openTraining()">训练场</button>
+    <button onclick="openAchievements()">成就</button>
+    <p style="font-size:12px;color:#888;margin-top:6px;">
+      提示：游戏内有存档/读档功能，可安心作死。<br>
+      推荐使用键盘操作，手机浏览器体验会比较抽象。
+    </p>
+  </div>
+
+  <!-- 设置界面 -->
+  <div id="settingsScreen" style="display:none;">
+    <h2 style="font-size:18px;margin:0 0 4px;">设置</h2>
+
+    <div class="setting-section">
+      <h3>键位设置</h3>
+      <p style="font-size:12px;color:#aaa;">点击输入框后按键即可更改该动作的按键。</p>
+      <div class="control-row">
+        <span>上移：</span>
+        <input class="control-input" data-action="up" readonly />
+      </div>
+      <div class="control-row">
+        <span>下移：</span>
+        <input class="control-input" data-action="down" readonly />
+      </div>
+      <div class="control-row">
+        <span>左移：</span>
+        <input class="control-input" data-action="left" readonly />
+      </div>
+      <div class="control-row">
+        <span>右移：</span>
+        <input class="control-input" data-action="right" readonly />
+      </div>
+      <div class="control-row">
+        <span>原地等待：</span>
+        <input class="control-input" data-action="wait" readonly />
+      </div>
+      <p style="font-size:11px;color:#777;">
+        默认：WASD 移动，空格原地等一回合。你也可以改成方向键或别的键。
+      </p>
+    </div>
+
+    <div class="setting-section">
+      <h3>开发者模式</h3>
+      <label style="font-size:13px;">
+        <input type="checkbox" id="devModeToggle" />
+        开发者模式（无敌）：受到任何伤害都会被当场否决<br>
+      </label>
+      <p style="font-size:11px;color:#777;">
+        适合单纯想乱杀、测试怪物和道具，不想被地牢教育的时候。
+      </p>
+    </div>
+
+    <button class="back-btn" onclick="backToMenu()">返回主菜单</button>
+  </div>
+
+  <!-- 成就界面 -->
+  <div id="achievementsScreen" style="display:none;">
+    <h2 style="font-size:18px;margin:0 0 4px;">成就</h2>
+    <p style="font-size:12px;color:#aaa;">
+      难度颜色：<span style="color:#64b5f6;">蓝色</span> &lt;
+      <span style="color:#b388ff;">紫色</span> &lt;
+      <span style="color:#f48fb1;">粉色</span> &lt;
+      <span style="color:#ef5350;">红色</span> &lt;
+      <span style="color:#ffd54f;">金色</span>
+    </p>
+    <div id="achievementsList"></div>
+    <button class="back-btn" onclick="backToMenu()">返回主菜单</button>
+  </div>
+
+  <!-- 游戏界面 -->
+  <div id="container">
+    <div id="stats"></div>
+    <div id="instructions"></div>
+
+    <div id="legend">
+      <strong>符号说明：</strong><br>
+      @ - 主角（你）<br>
+      . - 地板 / 可通行　　# - 墙体 / 不可通行<br>
+      d - 完美d+（普通怪，最弱，出场最多）<br>
+      c - 魔王c+（普通怪）<br>
+      s - 答辩s（普通怪）<br>
+      m - 魔丸s（普通怪中最强）<br>
+      L - 吕÷（小精英怪，靠近会用二手烟法术灼烧你）<br>
+      H - 胡跌（大精英怪，制造恐慌，攻击可能 MISS）<br>
+      + - 红药：恢复生命<br>
+      ) - 武器：提高攻击<br>
+      * - 护甲：提高最大生命<br>
+      M - 防毒面具：提高法术抗性，二手烟变成微风<br>
+      D - DMA：大幅强化全属性，一口下去直接起飞<br>
+    </div>
+
+    <div id="saveLoadBar">
+      <button onclick="saveGame()">存档</button>
+      <button onclick="loadGame()">读档</button>
+      <button onclick="backToMenu()">返回主菜单</button>
+      <span style="font-size:11px;color:#777;">（存档保存在本地浏览器）</span>
+    </div>
+
+    <pre id="game"></pre>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    // === 基本全局状态 ===
+    const WIDTH = 30;
+    const HEIGHT = 18;
+    const WALL_CHANCE = 0.14;
+    const ENEMY_COUNT_BASE = 6;
+    const ITEM_COUNT_BASE = 5;
+
+    let map = [];
+    let player = null;
+    let enemies = [];
+    let items = [];
+    let floor = 1;
+    let gameOver = false;
+
+    let currentScreen = "menu"; // "menu" | "game" | "training" | "settings" | "achievements"
+    let trainingMode = false;
+    let devMode = false;
+
+    const stats = {
+      damageTakenThisFloor: 0
+    };
+
+    // === 控件引用 ===
+    const containerEl = document.getElementById("container");
+    const mainMenuEl = document.getElementById("mainMenu");
+    const settingsScreenEl = document.getElementById("settingsScreen");
+    const achievementsScreenEl = document.getElementById("achievementsScreen");
+
+    const gameEl = document.getElementById("game");
+    const statsEl = document.getElementById("stats");
+    const logEl = document.getElementById("log");
+    const instructionsEl = document.getElementById("instructions");
+    const devModeToggleEl = document.getElementById("devModeToggle");
+
+    // === 日志系统 ===
+    function addLog(msg, type = "info") {
+      const div = document.createElement("div");
+      div.classList.add("log-line");
+      if (type === "good") div.classList.add("log-good");
+      else if (type === "bad") div.classList.add("log-bad");
+      else if (type === "silly") div.classList.add("log-silly");
+      else div.classList.add("log-info");
+      div.textContent = msg;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function clearLog() {
+      logEl.innerHTML = "";
+    }
+
+    // === 控制键设置 ===
+    const DEFAULT_CONTROLS = {
+      up: "w",
+      down: "s",
+      left: "a",
+      right: "d",
+      wait: " "
+    };
+    let controls = { ...DEFAULT_CONTROLS };
+    let editingAction = null;
+
+    function loadControls() {
+      try {
+        const raw = localStorage.getItem("roguelike_controls");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          controls = { ...DEFAULT_CONTROLS, ...parsed };
+        }
+      } catch (e) {}
+      updateControlInputs();
+    }
+
+    function saveControls() {
+      try {
+        localStorage.setItem("roguelike_controls", JSON.stringify(controls));
+      } catch (e) {}
+    }
+
+    function updateControlInputs() {
+      const inputs = document.querySelectorAll(".control-input");
+      inputs.forEach(inp => {
+        const action = inp.dataset.action;
+        inp.value = prettyKeyName(controls[action]);
+        inp.addEventListener("focus", () => {
+          editingAction = action;
+          inp.value = "按任意键...";
+        });
+      });
+    }
+
+    function prettyKeyName(key) {
+      if (key === " ") return "Space";
+      return key;
+    }
+
+    // === 敌人 & 数值设计 ===
+    const ENEMY_DEFS = {
+      // 普通怪：从弱到强：完美d+ < 魔王c+ < 答辩s < 魔丸s
+      wanmei: {
+        id: "wanmei",
+        name: "完美d+",
+        symbol: "d",
+        kind: "normal",
+        baseHp: 5,
+        hpPerFloor: 1,
+        baseAtk: 2,
+        atkPerFloor: 0.4
+      },
+      mowang: {
+        id: "mowang",
+        name: "魔王c+",
+        symbol: "c",
+        kind: "normal",
+        baseHp: 7,
+        hpPerFloor: 1.1,
+        baseAtk: 3,
+        atkPerFloor: 0.45
+      },
+      dabian: {
+        id: "dabian",
+        name: "答辩s",
+        symbol: "s",
+        kind: "normal",
+        baseHp: 9,
+        hpPerFloor: 1.2,
+        baseAtk: 4,
+        atkPerFloor: 0.5
+      },
+      mowanmaru: {
+        id: "mowanmaru",
+        name: "魔丸s",
+        symbol: "m",
+        kind: "normal",
+        baseHp: 11,
+        hpPerFloor: 1.3,
+        baseAtk: 5,
+        atkPerFloor: 0.6
+      },
+      // 小精英：吕÷ —— 二手烟法术伤害
+      lv: {
+        id: "lv",
+        name: "吕÷",
+        symbol: "L",
+        kind: "eliteSmall",
+        baseHp: 18,
+        hpPerFloor: 1.5,
+        baseAtk: 4,
+        atkPerFloor: 0.6,
+        auraBase: 3,
+        auraPerFloor: 0.5
+      },
+      // 大精英：胡跌 —— 恐慌 Buff
+      hu: {
+        id: "hu",
+        name: "胡跌",
+        symbol: "H",
+        kind: "eliteBig",
+        baseHp: 26,
+        hpPerFloor: 2.0,
+        baseAtk: 6,
+        atkPerFloor: 0.8
+      }
+    };
+
+    function createEnemyAtLevel(id, x, y, levelFloor) {
+      const def = ENEMY_DEFS[id];
+      const lvl = Math.max(1, levelFloor);
+      const hp = Math.round(def.baseHp + def.hpPerFloor * lvl);
+      const atk = Math.round(def.baseAtk + def.atkPerFloor * lvl);
+      return {
+        id: def.id,
+        name: def.name,
+        symbol: def.symbol,
+        kind: def.kind,
+        x,
+        y,
+        hp,
+        maxHp: hp,
+        atk
+      };
+    }
+
+    function createEnemy(id, x, y) {
+      return createEnemyAtLevel(id, x, y, floor);
+    }
+
+    // === 道具设计 ===
+    function makeItem(type, x, y) {
+      if (type === "potion") {
+        return {
+          type: "potion",
+          symbol: "+",
+          name: "红药",
+          desc: "喝一口，血条和理智都稍微回一点。",
+          x, y
+        };
+      } else if (type === "weapon") {
+        return {
+          type: "weapon",
+          symbol: ")",
+          name: "歪批砍刀",
+          desc: "攻击 +1，你的输出开始有底气。",
+          x, y
+        };
+      } else if (type === "armor") {
+        return {
+          type: "armor",
+          symbol: "*",
+          name: "社恐护甲",
+          desc: "最大生命 +2，躲事能力同步 UP。",
+          x, y
+        };
+      } else if (type === "mask") {
+        return {
+          type: "mask",
+          symbol: "M",
+          name: "防毒面具",
+          desc: "法术抗性 +40%，吕÷的二手烟变成小风扇。",
+          x, y
+        };
+      } else if (type === "dma") {
+        return {
+          type: "dma",
+          symbol: "D",
+          name: "DMA",
+          desc: "大幅度增强各项数值，直接进入答辩抽风状态。",
+          x, y
+        };
+      }
+      return null;
+    }
+
+    // === 成就系统 ===
+    const ACH_DEFS = [
+      { id: "first_blood", name: "第一滴血", difficulty: "蓝色", desc: "第一次击杀任意怪物。" },
+      { id: "first_item", name: "打工人的第一件装备", difficulty: "蓝色", desc: "第一次拾取任意道具。" },
+      { id: "reach_floor_3", name: "卷王起步", difficulty: "紫色", desc: "到达第 3 层地牢。" },
+      { id: "reach_floor_5", name: "越卷越深", difficulty: "粉色", desc: "到达第 5 层地牢。" },
+      { id: "kill_lv", name: "戒烟劝退师", difficulty: "粉色", desc: "击杀小精英怪【吕÷】一次。" },
+      { id: "kill_hu", name: "战胜胡跌的压力", difficulty: "红色", desc: "击杀大精英怪【胡跌】一次。" },
+      { id: "no_damage_floor", name: "今天我不挨打", difficulty: "金色", desc: "完整通关一层而不受到任何伤害。" },
+      { id: "use_dma", name: "DMA 一口闷", difficulty: "粉色", desc: "成功使用一次【DMA】。" },
+      { id: "die_once", name: "地牢社会初体验", difficulty: "蓝色", desc: "第一次死在地牢里。" },
+      { id: "visit_training", name: "训练场见习生", difficulty: "蓝色", desc: "进入训练场一次。" },
+      { id: "reach_floor_10", name: "魔丸毕业生", difficulty: "红色", desc: "到达第 10 层地牢。" }
+    ];
+
+    const achievements = ACH_DEFS.map(a => ({ ...a, unlocked: false }));
+
+    function difficultyToClass(diff) {
+      switch (diff) {
+        case "蓝色": return "ach-blue";
+        case "紫色": return "ach-purple";
+        case "粉色": return "ach-pink";
+        case "红色": return "ach-red";
+        case "金色": return "ach-gold";
+        default: return "ach-blue";
+      }
+    }
+
+    function unlockAchievement(id) {
+      const a = achievements.find(x => x.id === id);
+      if (!a || a.unlocked) return;
+      a.unlocked = true;
+      addLog(`成就解锁：《${a.name}》`, "good");
+    }
+
+    function renderAchievements() {
+      const list = document.getElementById("achievementsList");
+      list.innerHTML = "";
+      achievements.forEach(a => {
+        const div = document.createElement("div");
+        div.classList.add("achievement");
+        div.classList.add(difficultyToClass(a.difficulty));
+        div.innerHTML =
+          `<strong>${a.name}</strong> [${a.difficulty}] ${a.unlocked ? "✅" : "❌"}<br>` +
+          `${a.desc}`;
+        list.appendChild(div);
+      });
+    }
+
+    // === 工具函数 ===
+    function randInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function isWall(x, y) {
+      if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return true;
+      return map[y][x] === "#";
+    }
+
+    function entityAt(arr, x, y) {
+      return arr.find(e => e.x === x && e.y === y) || null;
+    }
+
+    function isBlocked(x, y) {
+      if (isWall(x, y)) return true;
+      if (entityAt(enemies, x, y)) return true;
+      return false;
+    }
+
+    // === 地图 ===
+    function generateMap() {
+      map = [];
+      for (let y = 0; y < HEIGHT; y++) {
+        const row = [];
+        for (let x = 0; x < WIDTH; x++) {
+          if (y === 0 || y === HEIGHT - 1 || x === 0 || x === WIDTH - 1) {
+            row.push("#");
+          } else {
+            row.push(Math.random() < WALL_CHANCE ? "#" : ".");
+          }
+        }
+        map.push(row);
+      }
+    }
+
+    function getRandomFloorTile() {
+      let x, y;
+      let safety = 0;
+      do {
+        x = randInt(1, WIDTH - 2);
+        y = randInt(1, HEIGHT - 2);
+        safety++;
+        if (safety > 2000) break;
+      } while (
+        map[y][x] !== "." ||
+        entityAt(enemies, x, y) ||
+        entityAt(items, x, y)
+      );
+      return { x, y };
+    }
+
+    // === 楼层初始化 ===
+    function setupFloor(resetPlayer = false) {
+      generateMap();
+      enemies = [];
+      items = [];
+      stats.damageTakenThisFloor = 0;
+
+      const totalEnemies = ENEMY_COUNT_BASE + Math.floor(floor * 1.5);
+      let bigEliteCount = 0;
+      let smallEliteCount = 0;
+
+      for (let i = 0; i < totalEnemies; i++) {
+        const pos = getRandomFloorTile();
+        let id;
+        const r = Math.random();
+
+        // 大精英：胡跌，出现概率约 5%，最多 2 个
+        if (r < 0.05 && bigEliteCount < 2) {
+          id = "hu";
+          bigEliteCount++;
+        }
+        // 小精英：吕÷，出现概率约 15%
+        else if (r < 0.2) {
+          id = "lv";
+          smallEliteCount++;
+        }
+        // 普通怪，按出现频率从高到低：完美d+ > 魔王c+ > 答辩s > 魔丸s
+        else {
+          const rr = Math.random();
+          if (rr < 0.4) id = "wanmei";
+          else if (rr < 0.7) id = "mowang";
+          else if (rr < 0.9) id = "dabian";
+          else id = "mowanmaru";
+        }
+        enemies.push(createEnemy(id, pos.x, pos.y));
+      }
+
+      // 道具：红药 / 武器 / 护甲 / 防毒面具（稀有）
+      const itemCount = ITEM_COUNT_BASE + Math.floor(floor);
+      for (let i = 0; i < itemCount; i++) {
+        const pos = getRandomFloorTile();
+        const r = Math.random();
+        let type = "potion";
+        if (r < 0.4) type = "potion";
+        else if (r < 0.65) type = "weapon";
+        else if (r < 0.9) type = "armor";
+        else type = "mask";
+        const it = makeItem(type, pos.x, pos.y);
+        if (it) items.push(it);
+      }
+
+      if (!player || resetPlayer) {
+        const pos = getRandomFloorTile();
+        player = {
+          x: pos.x,
+          y: pos.y,
+          hp: 20,
+          maxHp: 20,
+          atk: 4,
+          exp: 0,
+          level: 1,
+          magicRes: 0,
+          panicTurns: 0,
+          hasPickedItem: false
+        };
+      } else {
+        const pos = getRandomFloorTile();
+        player.x = pos.x;
+        player.y = pos.y;
+        stats.damageTakenThisFloor = 0;
+      }
+
+      gameOver = false;
+      trainingMode = false;
+      updateInstructions();
+      render();
+      addLog(`—— 你来到了第 ${floor} 层地牢，空气中弥漫着卷味 ——`, "silly");
+    }
+
+    // === 训练场初始化 ===
+    function setupTraining() {
+      generateMap();
+      enemies = [];
+      items = [];
+      stats.damageTakenThisFloor = 0;
+
+      const levelForTraining = 3;
+
+      // 所有怪物各一个
+      const enemyIds = Object.keys(ENEMY_DEFS);
+      enemyIds.forEach(id => {
+        const pos = getRandomFloorTile();
+        enemies.push(createEnemyAtLevel(id, pos.x, pos.y, levelForTraining));
+      });
+
+      // 所有道具各一个：红药 / 武器 / 护甲 / 防毒面具 / DMA
+      const itemTypes = ["potion", "weapon", "armor", "mask", "dma"];
+      itemTypes.forEach(type => {
+        const pos = getRandomFloorTile();
+        const it = makeItem(type, pos.x, pos.y);
+        if (it) items.push(it);
+      });
+
+      const pos = getRandomFloorTile();
+      player = {
+        x: pos.x,
+        y: pos.y,
+        hp: 999,
+        maxHp: 999,
+        atk: 10,
+        exp: 0,
+        level: 1,
+        magicRes: 0.5,
+        panicTurns: 0,
+        hasPickedItem: false
+      };
+
+      gameOver = false;
+      trainingMode = true;
+      updateInstructions();
+      clearLog();
+      addLog("欢迎来到训练场：怪物不会攻击，你可以尽情试刀和体验道具效果。", "info");
+      render();
+    }
+
+    // === 界面切换 ===
+    function showScreen(name) {
+      currentScreen = name;
+      mainMenuEl.style.display = name === "menu" ? "block" : "none";
+      settingsScreenEl.style.display = name === "settings" ? "block" : "none";
+      achievementsScreenEl.style.display = name === "achievements" ? "block" : "none";
+      containerEl.style.display = (name === "game" || name === "training") ? "inline-block" : "none";
+    }
+
+    function startNewGame() {
+      floor = 1;
+      clearLog();
+      setupFloor(true);
+      showScreen("game");
+    }
+
+    function openSettings() {
+      showScreen("settings");
+    }
+
+    function openTraining() {
+      unlockAchievement("visit_training");
+      setupTraining();
+      showScreen("training");
+    }
+
+    function openAchievements() {
+      renderAchievements();
+      showScreen("achievements");
+    }
+
+    function backToMenu() {
+      showScreen("menu");
+    }
+
+    function updateInstructions() {
+      if (trainingMode) {
+        instructionsEl.innerHTML =
+          "模式：训练场（怪物不会攻击，打死会复活，道具拾取后会刷新）。<br>" +
+          "操作：使用你设置的按键移动，原地等一回合；N 开新局（训练场重新生成）。";
+      } else {
+        instructionsEl.innerHTML =
+          "模式：正式地牢。操作：使用你设置的按键移动，原地等一回合；N 开新局。<br>" +
+          "目标：活得尽量久，多打怪、多捡东西，顺带解锁各种成就。";
+      }
+    }
+
+    // === 渲染 ===
+    function render() {
+      if (!player || !map.length) return;
+      let output = "";
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          let ch = map[y][x];
+          if (player.x === x && player.y === y) {
+            ch = "@";
+          } else {
+            const enemy = entityAt(enemies, x, y);
+            const item = entityAt(items, x, y);
+            if (enemy) ch = enemy.symbol;
+            else if (item) ch = item.symbol;
+          }
+          output += ch;
+        }
+        if (y < HEIGHT - 1) output += "\n";
+      }
+      gameEl.textContent = output;
+
+      const mrPercent = Math.round((player.magicRes || 0) * 100);
+      let panicText = "";
+      if (player.panicTurns && player.panicTurns > 0) {
+        panicText = `  [恐慌 ${player.panicTurns}]`;
+      }
+      let modeText = trainingMode ? "训练场" : `第 ${floor} 层`;
+      let devText = devMode ? "  [DEV 无敌]" : "";
+      statsEl.textContent =
+        `HP: ${player.hp}/${player.maxHp}  ` +
+        `ATK: ${player.atk}  ` +
+        `MR: ${mrPercent}%  ` +
+        `LV: ${player.level} (EXP ${player.exp})  ` +
+        `模式: ${modeText}` +
+        panicText +
+        devText;
+    }
+
+    // === 伤害相关 ===
+    function damagePlayerPhysical(dmg, fromName) {
+      if (devMode) {
+        addLog(`【${fromName}】试图打你一拳，被你的无敌模式弹开了。`, "info");
+        return;
+      }
+      dmg = Math.max(1, dmg);
+      player.hp -= dmg;
+      stats.damageTakenThisFloor += dmg;
+      addLog(`你被【${fromName}】刮掉了 ${dmg} 点血。`, "bad");
+      if (player.hp <= 0) {
+        player.hp = 0;
+        gameOver = true;
+        addLog("你倒在地上，最后的念头是：这把其实还能打……", "bad");
+        addLog("按 N 开新局，再卷一次。", "info");
+        unlockAchievement("die_once");
+      }
+      render();
+    }
+
+    function damagePlayerMagic(raw, fromName) {
+      if (devMode) {
+        addLog(`【${fromName}】释放了法术，但你的无敌模式一脸无所谓。`, "info");
+        return;
+      }
+      const mr = Math.max(0, Math.min(0.9, player.magicRes || 0));
+      let dmg = Math.round(raw * (1 - mr));
+      dmg = Math.max(1, dmg);
+      player.hp -= dmg;
+      stats.damageTakenThisFloor += dmg;
+      addLog(`你受到来自【${fromName}】的法术伤害 ${dmg} 点。`, "bad");
+      if (player.hp <= 0) {
+        player.hp = 0;
+        gameOver = true;
+        addLog("你被法术熏倒在地，最后的念头是：下次一定带防毒面具。", "bad");
+        addLog("按 N 开新局，再卷一次。", "info");
+        unlockAchievement("die_once");
+      }
+      render();
+    }
+
+    // === 战斗 & 道具 ===
+    function gainExp(amount) {
+      player.exp += amount;
+      while (player.exp >= player.level * 10) {
+        player.exp -= player.level * 10;
+        player.level++;
+        player.maxHp += 2;
+        player.hp = player.maxHp;
+        player.atk += 1;
+        addLog("升级！你感觉自己不止是个人，更像一台刷怪机器。", "good");
+      }
+    }
+
+    function handleTrainingRespawn(enemy) {
+      enemy.hp = enemy.maxHp;
+      const pos = getRandomFloorTile();
+      enemy.x = pos.x;
+      enemy.y = pos.y;
+      addLog(`你击倒了训练用【${enemy.name}】，它满血爬起来继续陪练。`, "info");
+    }
+
+    function attackEnemy(enemy) {
+      if (!enemy) return;
+
+      // 恐慌 buff：攻击可能 MISS
+      if (!trainingMode && player.panicTurns && player.panicTurns > 0) {
+        const missChance = 0.35;
+        if (Math.random() < missChance) {
+          addLog("你在恐慌中乱挥一通，这一击 MISS 了。", "bad");
+          player.panicTurns--;
+          return;
+        } else {
+          player.panicTurns--;
+        }
+      }
+
+      const dmg = player.atk;
+      enemy.hp -= dmg;
+      addLog(`你对【${enemy.name}】造成了 ${dmg} 点伤害！`, "good");
+
+      if (enemy.hp <= 0) {
+        // 训练场：只复活，不掉落
+        if (trainingMode) {
+          handleTrainingRespawn(enemy);
+          render();
+          return;
+        }
+
+        // 实战死亡处理
+        addLog(`【${enemy.name}】卒：打工人倒下了一个，又有千千万万站起来。`, "silly");
+
+        // 特殊死亡台词 & 掉落
+        if (enemy.id === "lv") {
+          addLog("爱谁玩谁玩 我反正不玩了(kotori退出了kook)(kotori正在游玩雀魂麻将)", "silly");
+          unlockAchievement("kill_lv");
+        }
+        if (enemy.id === "hu") {
+          addLog("【胡跌】倒下，压力指数瞬间清零，掉落了【DMA】。", "good");
+          const it = makeItem("dma", enemy.x, enemy.y);
+          if (it) items.push(it);
+          unlockAchievement("kill_hu");
+        }
+
+        // 经验奖励
+        let expGainVal = 5;
+        if (enemy.kind === "eliteSmall") expGainVal = 12;
+        else if (enemy.kind === "eliteBig") expGainVal = 20;
+
+        gainExp(expGainVal);
+
+        // 成就：第一次击杀
+        unlockAchievement("first_blood");
+
+        // 移除敌人
+        const idx = enemies.indexOf(enemy);
+        if (idx >= 0) enemies.splice(idx, 1);
+
+        checkFloorClear();
+      }
+
+      render();
+    }
+
+    function pickItem(item) {
+      if (!item) return;
+
+      if (!player.hasPickedItem) {
+        player.hasPickedItem = true;
+        unlockAchievement("first_item");
+      }
+
+      if (trainingMode) {
+        // 训练场：道具被捡起后刷新到随机位置
+        applyItemEffect(item);
+        const pos = getRandomFloorTile();
+        item.x = pos.x;
+        item.y = pos.y;
+        addLog(`训练用【${item.name}】重置到了别的地方。`, "info");
+      } else {
+        // 正式模式：道具用完即消失
+        applyItemEffect(item);
+        const idx = items.indexOf(item);
+        if (idx >= 0) items.splice(idx, 1);
+      }
+
+      render();
+    }
+
+    function applyItemEffect(item) {
+      if (item.type === "potion") {
+        const heal = randInt(4, 8);
+        player.hp = Math.min(player.maxHp, player.hp + heal);
+        addLog(`你喝下【${item.name}】，恢复了 ${heal} 点生命。`, "good");
+      } else if (item.type === "weapon") {
+        player.atk += 1;
+        addLog(`你装备了【${item.name}】，攻击 +1。`, "good");
+      } else if (item.type === "armor") {
+        player.maxHp += 2;
+        player.hp += 2;
+        addLog(`你穿上【${item.name}】，最大生命 +2。`, "good");
+      } else if (item.type === "mask") {
+        player.magicRes = (player.magicRes || 0) + 0.4;
+        if (player.magicRes > 0.9) player.magicRes = 0.9;
+        addLog(`你戴上【${item.name}】，法术抗性大幅提升。`, "good");
+      } else if (item.type === "dma") {
+        player.maxHp += 6;
+        player.hp += 6;
+        player.atk += 2;
+        player.magicRes = (player.magicRes || 0) + 0.3;
+        if (player.magicRes > 0.9) player.magicRes = 0.9;
+        gainExp(15);
+        addLog("DMA 一口闷！你感觉自己瞬间进入魔丸状态。", "good");
+        unlockAchievement("use_dma");
+      }
+      addLog(item.desc, "silly");
+    }
+
+    // === 敌人行动 ===
+    function enemyTurn() {
+      if (gameOver) return;
+      if (trainingMode) {
+        // 训练场怪物不会攻击、不移动
+        return;
+      }
+
+      for (const e of enemies) {
+        const dx = player.x - e.x;
+        const dy = player.y - e.y;
+        const dist = Math.abs(dx) + Math.abs(dy);
+
+        // 吕÷：靠近时造成二手烟法术伤害
+        if (e.id === "lv" && dist <= 2) {
+          const def = ENEMY_DEFS["lv"];
+          const raw = def.auraBase + def.auraPerFloor * floor;
+          damagePlayerMagic(raw, "吕÷的二手烟");
+        }
+
+        // 胡跌：靠近时施加恐慌 buff
+        if (e.id === "hu" && dist <= 2) {
+          if (!player.panicTurns || player.panicTurns <= 0) {
+            addLog("你感受到来自【胡跌】的精神暴击，陷入恐慌！", "bad");
+          }
+          player.panicTurns = 5;
+        }
+
+        // 邻格就物理攻击
+        if (dist === 1) {
+          const dmg = Math.max(1, e.atk + randInt(-1, 1));
+          damagePlayerPhysical(dmg, e.name);
+          continue;
+        }
+
+        // 简单寻路：朝着玩家轴向靠近
+        let stepX = 0, stepY = 0;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          stepX = dx > 0 ? 1 : -1;
+        } else if (dy !== 0) {
+          stepY = dy > 0 ? 1 : -1;
+        }
+
+        const nx = e.x + stepX;
+        const ny = e.y + stepY;
+
+        if (!isBlocked(nx, ny) && !(player.x === nx && player.y === ny)) {
+          e.x = nx;
+          e.y = ny;
+        }
+      }
+
+      render();
+    }
+
+    // === 楼层通关检测 ===
+    function checkFloorClear() {
+      if (trainingMode) return;
+      if (enemies.length === 0 && !gameOver) {
+        // 成就：无伤通关一层
+        if (stats.damageTakenThisFloor === 0) {
+          unlockAchievement("no_damage_floor");
+        }
+
+        const prevFloor = floor;
+        floor++;
+        addLog(`第 ${prevFloor} 层清空！你大摇大摆地踏入更阴间的一层。`, "good");
+
+        if (floor >= 3) unlockAchievement("reach_floor_3");
+        if (floor >= 5) unlockAchievement("reach_floor_5");
+        if (floor >= 10) unlockAchievement("reach_floor_10");
+
+        setupFloor(false);
+      }
+    }
+
+    // === 玩家行动 ===
+    function tryMovePlayer(dx, dy) {
+      if (!player || gameOver) return;
+
+      if (dx === 0 && dy === 0) {
+        addLog("你什么也没做，只是原地发呆了一回合。", "info");
+        enemyTurn();
+        return;
+      }
+
+      const nx = player.x + dx;
+      const ny = player.y + dy;
+
+      if (isWall(nx, ny)) {
+        addLog("你撞在墙上，墙没事，你有点疼。", "silly");
+        return;
+      }
+
+      const enemy = entityAt(enemies, nx, ny);
+      if (enemy) {
+        attackEnemy(enemy);
+        enemyTurn();
+        return;
+      }
+
+      player.x = nx;
+      player.y = ny;
+
+      const item = entityAt(items, nx, ny);
+      if (item) {
+        pickItem(item);
+      }
+
+      enemyTurn();
+      render();
+    }
+
+    // === 存档功能 ===
+    function saveGame() {
+      if (!player || !map.length) {
+        alert("当前没有进行中的游戏，无法存档。");
+        return;
+      }
+      const data = {
+        version: 1,
+        floor,
+        gameOver,
+        player,
+        enemies,
+        items,
+        map: map.map(row => row.join("")),
+        devMode,
+        trainingMode,
+        achievements: achievements.map(a => ({ id: a.id, unlocked: a.unlocked }))
+      };
+      try {
+        localStorage.setItem("roguelike_save", JSON.stringify(data));
+        addLog("游戏已存档到本地浏览器。", "good");
+      } catch (e) {
+        alert("存档失败：可能浏览器禁用了本地存储。");
+      }
+    }
+
+    function loadGame() {
+      const raw = localStorage.getItem("roguelike_save");
+      if (!raw) {
+        alert("没有找到存档。");
+        return;
+      }
+      try {
+        const data = JSON.parse(raw);
+        floor = data.floor;
+        gameOver = data.gameOver;
+        player = data.player;
+        enemies = data.enemies || [];
+        items = data.items || [];
+        map = (data.map || []).map(row => row.split(""));
+        devMode = !!data.devMode;
+        devModeToggleEl.checked = devMode;
+        trainingMode = !!data.trainingMode;
+        if (Array.isArray(data.achievements)) {
+          const unlockedSet = new Set(
+            data.achievements.filter(x => x.unlocked).map(x => x.id)
+          );
+          achievements.forEach(a => {
+            a.unlocked = unlockedSet.has(a.id);
+          });
+        }
+        stats.damageTakenThisFloor = 0;
+        updateInstructions();
+        showScreen(trainingMode ? "training" : "game");
+        clearLog();
+        addLog("成功读取存档。", "good");
+        render();
+      } catch (e) {
+        alert("存档损坏或解析失败。");
+      }
+    }
+
+    // === 键盘控制 ===
+    window.addEventListener("keydown", (e) => {
+      // 设置界面键位改动
+      if (currentScreen === "settings" && editingAction) {
+        e.preventDefault();
+        const action = editingAction;
+        controls[action] = e.key;
+        const inp = document.querySelector(`.control-input[data-action="${action}"]`);
+        if (inp) inp.value = prettyKeyName(e.key);
+        editingAction = null;
+        saveControls();
+        return;
+      }
+
+      // 游戏 / 训练场内操作
+      if (currentScreen === "game" || currentScreen === "training") {
+        handleGameKey(e);
+      }
+    });
+
+    function handleGameKey(e) {
+      const key = e.key;
+
+      // 新局
+      if (key === "n" || key === "N") {
+        e.preventDefault();
+        if (trainingMode) {
+          setupTraining();
+        } else {
+          floor = 1;
+          clearLog();
+          setupFloor(true);
+        }
+        return;
+      }
+
+      let dx = 0, dy = 0;
+      if (key === controls.up) {
+        dy = -1;
+      } else if (key === controls.down) {
+        dy = 1;
+      } else if (key === controls.left) {
+        dx = -1;
+      } else if (key === controls.right) {
+        dx = 1;
+      } else if (key === controls.wait) {
+        dx = 0;
+        dy = 0;
+      } else {
+        return;
+      }
+
+      e.preventDefault();
+      tryMovePlayer(dx, dy);
+    }
+
+    // === 初始化 ===
+    devModeToggleEl.addEventListener("change", () => {
+      devMode = devModeToggleEl.checked;
+      render();
+    });
+
+    // 载入键位配置
+    loadControls();
+
+    // 初始显示主菜单
+    showScreen("menu");
+  </script>
+</body>
+</html>
